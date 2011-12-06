@@ -1,0 +1,333 @@
+diff -urNp star-1.5-orig/conf/configure.in star-1.5/conf/configure.in
+--- star-1.5-orig/conf/configure.in	2008-03-27 19:58:16.000000000 +0100
++++ star-1.5/conf/configure.in	2008-12-18 16:11:49.000000000 +0100
+@@ -452,6 +452,15 @@ AC_CHECK_FUNCS(sched_yield)
+ AC_CHECK_FUNCS(nanosleep)
+ LIBS="$ac_save_LIBS"
+ 
++AC_CHECK_HEADERS(selinux/selinux.h)
++if test "$ac_cv_header_selinux_selinux_h" = yes; then
++  AC_CHECKING(for SELinux support)
++  AC_CHECK_LIB(selinux, is_selinux_enabled, lib_selinux="-lselinux -lattr")
++  ac_save_LIBS="$LIBS"
++  LIBS="$LIBS $lib_selinux"
++  AC_CHECK_FUNCS(is_selinux_enabled)
++fi
++
+ dnl Misc OS checks.
+ AC_MSG_CHECKING(for /dev/tty)
+ if test -r /dev/tty; then
+@@ -543,5 +552,6 @@ AC_SUBST(lib_secdb)
+ AC_SUBST(lib_gen)
+ AC_SUBST(lib_pthread)
+ AC_SUBST(lib_rt)
++AC_SUBST(lib_selinux)
+ 
+ AC_OUTPUT(rules.cnf)
+diff -urNp star-1.5-orig/conf/rules.cnf.in star-1.5/conf/rules.cnf.in
+--- star-1.5-orig/conf/rules.cnf.in	2008-02-20 18:52:09.000000000 +0100
++++ star-1.5/conf/rules.cnf.in	2008-12-18 16:09:30.000000000 +0100
+@@ -21,3 +21,4 @@ LIB_SECDB = @lib_secdb@
+ LIB_GEN = @lib_gen@
+ LIB_PTHREAD = @lib_pthread@
+ LIB_RT = @lib_rt@
++LIB_SELINUX = @lib_selinux@
+diff -urNp star-1.5-orig/star/cpio.mk star-1.5/star/cpio.mk
+--- star-1.5-orig/star/cpio.mk	2008-04-06 20:01:45.000000000 +0200
++++ star-1.5/star/cpio.mk	2008-12-18 16:00:27.000000000 +0100
+@@ -19,6 +19,7 @@ CPPOPTS +=	-DUSE_FIND
+ CPPOPTS +=	-DUSE_ACL
+ CPPOPTS +=	-DUSE_XATTR
+ CPPOPTS +=	-DUSE_FFLAGS
++CPPOPTS +=	-DWITH_SELINUX
+ CPPOPTS +=	-DSCHILY_PRINT
+ CFILES=		cpio.c header.c cpiohdr.c xheader.c xattr.c \
+ 		list.c extract.c create.c append.c diff.c restore.c \
+@@ -34,7 +35,7 @@ CFILES=		cpio.c header.c cpiohdr.c xhead
+ HFILES=		star.h starsubs.h dirtime.h xtab.h xutimes.h \
+ 		movearch.h table.h props.h fifo.h diff.h \
+ 		checkerr.h dumpdate.h bitstring.h
+-LIBS=		-ldeflt -lrmt -lfind -lschily $(LIB_ACL) $(LIB_ATTR) $(LIB_SOCKET) $(LIB_INTL)
++LIBS=		-ldeflt -lrmt -lfind -lschily $(LIB_ACL) $(LIB_ATTR) $(LIB_SOCKET) $(LIB_INTL) $(LIB_SELINUX)
+ XMK_FILE=	scpioman.mk
+ 
+ ###########################################################################
+diff -urNp star-1.5-orig/star/extract.c star-1.5/star/extract.c
+--- star-1.5-orig/star/extract.c	2008-04-06 17:32:15.000000000 +0200
++++ star-1.5/star/extract.c	2008-12-18 15:59:46.000000000 +0100
+@@ -253,6 +253,17 @@ extern	struct WALK walkstate;
+ 			continue;
+ 		}
+ #endif
++
++#ifdef WITH_SELINUX
++                if (!to_stdout && selinux_enabled) {
++                    if (setselinux(&finfo) == FALSE) {
++                    errmsgno(EX_BAD,
++                             "Can not setup security context for '%s'. Not created.\n",
++                              finfo.f_name);
++                    }
++                }
++#endif
++
+ 		if (finfo.f_flags & F_BAD_META) {
+ 			if (!void_bad(&finfo))
+ 				break;
+diff -urNp star-1.5-orig/star/gnutar.mk star-1.5/star/gnutar.mk
+--- star-1.5-orig/star/gnutar.mk	2008-04-06 20:01:45.000000000 +0200
++++ star-1.5/star/gnutar.mk	2008-12-18 16:08:54.000000000 +0100
+@@ -19,6 +19,7 @@ CPPOPTS +=	-DUSE_FIND
+ CPPOPTS +=	-DUSE_ACL
+ CPPOPTS +=	-DUSE_XATTR
+ CPPOPTS +=	-DUSE_FFLAGS
++CPPOPTS +=	-DWITH_SELINUX
+ CPPOPTS +=	-DSCHILY_PRINT
+ CFILES=		gnutar.c header.c cpiohdr.c xheader.c xattr.c \
+ 		list.c extract.c create.c append.c diff.c restore.c \
+@@ -34,7 +35,7 @@ CFILES=		gnutar.c header.c cpiohdr.c xhe
+ HFILES=		star.h starsubs.h dirtime.h xtab.h xutimes.h \
+ 		movearch.h table.h props.h fifo.h diff.h \
+ 		checkerr.h dumpdate.h bitstring.h
+-LIBS=		-ldeflt -lrmt -lfind -lschily $(LIB_ACL) $(LIB_ATTR) $(LIB_SOCKET) $(LIB_INTL)
++LIBS=		-ldeflt -lrmt -lfind -lschily $(LIB_ACL) $(LIB_ATTR) $(LIB_SOCKET) $(LIB_INTL) $(LIB_SELINUX)
+ XMK_FILE=	gnutarman.mk
+ 
+ ###########################################################################
+diff -urNp star-1.5-orig/star/Makefile star-1.5/star/Makefile
+--- star-1.5-orig/star/Makefile	2008-04-06 20:02:25.000000000 +0200
++++ star-1.5/star/Makefile	2008-12-18 16:02:39.000000000 +0100
+@@ -1,66 +1,19 @@
+-#ident @(#)star_fat.mk	1.23 08/04/06 
++#ident @(#)all.mk	1.1 05/02/16 
+ ###########################################################################
+-#include		$(MAKE_M_ARCH).def
+ SRCROOT=	..
+ RULESDIR=	RULES
+ include		$(SRCROOT)/$(RULESDIR)/rules.top
+ ###########################################################################
+ 
+ #
+-# This is star_fat.mk, it creates one "fat" binary for all functionality.
++# This is all.mk, it creates sevral binaries, one for each function.
+ #
+-# If you like to create non "fat" binaries, remove Makefile
+-# and copy all.mk to Makefile.
++# If you like to create one single "fat" binary, remove Makefile
++# and copy star_fat.mk to Makefile.
+ #
+-INSDIR=		bin
+-TARGET=		star
+-#SYMLINKS=	ustar tar
+-SYMLINKS=	ustar tar gnutar suntar scpio spax
+-CPPOPTS +=	-D__STAR__
+-CPPOPTS +=	-DSET_CTIME -DFIFO -DUSE_MMAP -DUSE_REMOTE -DUSE_RCMD_RSH
+-#CPPOPTS +=	-DSET_CTIME -DFIFO -DUSE_MMAP
+-#CPPOPTS +=	-DSET_CTIME -DUSE_MMAP
+-#CPPOPTS +=	-DFIFO -DUSE_MMAP
+-CPPOPTS +=	-DUSE_LARGEFILES
+-CPPOPTS +=	-DUSE_FIND
+-CPPOPTS +=	-DUSE_ACL
+-CPPOPTS +=	-DUSE_XATTR
+-CPPOPTS +=	-DUSE_FFLAGS
+-CPPOPTS +=	-DCOPY_LINKS_DELAYED
+-CPPOPTS +=	-DSTAR_FAT
+-CPPOPTS +=	-DSCHILY_PRINT
+-CFILES=		star_fat.c header.c cpiohdr.c xheader.c xattr.c \
+-		list.c extract.c create.c append.c diff.c restore.c \
+-		remove.c star_unix.c acl_unix.c acltext.c fflags.c \
+-		buffer.c dirtime.c lhash.c \
+-		hole.c longnames.c \
+-		movearch.c table.c props.c \
+-		unicode.c \
+-		subst.c volhdr.c \
+-		chdir.c match.c defaults.c dumpdate.c \
+-		fifo.c device.c checkerr.c \
+-		\
+-		findinfo.c
+ 
+-HFILES=		star.h starsubs.h dirtime.h xtab.h xutimes.h \
+-		movearch.h table.h props.h fifo.h diff.h restore.h \
+-		checkerr.h dumpdate.h bitstring.h
+-
+-#LIBS=		-lunos
+-#LIBS=		-lschily -lc /usr/local/lib/gcc-gnulib
+-LIBS=		-ldeflt -lrmt -lfind -lschily $(LIB_ACL) $(LIB_ATTR) $(LIB_SOCKET) $(LIB_INTL)
+-#
+-#	Wenn -lfind, dann auch  $(LIB_INTL)
+-#
+-XMK_FILE=	Makefile.man starformatman.mk scpioman.mk gnutarman.mk \
+-		spaxman.mk suntarman.mk Makefile.dfl Makefile.doc
+-
+-star_fat.c: star.c
+-	$(RM) $(RM_FORCE) $@; cp star.c $@
++MK_FILES= star.mk pax.mk suntar.mk gnutar.mk cpio.mk 
+ 
+ ###########################################################################
+-include		$(SRCROOT)/$(RULESDIR)/rules.cmd
++include		$(SRCROOT)/$(RULESDIR)/rules.mks
+ ###########################################################################
+-count:	$(CFILES) $(HFILES)
+-	count $r1
+-
+diff -urNp star-1.5-orig/star/pax.mk star-1.5/star/pax.mk
+--- star-1.5-orig/star/pax.mk	2008-04-06 20:01:45.000000000 +0200
++++ star-1.5/star/pax.mk	2008-12-18 16:03:42.000000000 +0100
+@@ -19,6 +19,7 @@ CPPOPTS +=	-DUSE_FIND
+ CPPOPTS +=	-DUSE_ACL
+ CPPOPTS +=	-DUSE_XATTR
+ CPPOPTS +=	-DUSE_FFLAGS
++CPPOPTS +=	-DWITH_SELINUX
+ CPPOPTS +=	-DPAX
+ CPPOPTS +=	-DSCHILY_PRINT
+ CFILES=		pax.c header.c cpiohdr.c xheader.c xattr.c \
+@@ -35,7 +36,7 @@ CFILES=		pax.c header.c cpiohdr.c xheade
+ HFILES=		star.h starsubs.h dirtime.h xtab.h xutimes.h \
+ 		movearch.h table.h props.h fifo.h diff.h \
+ 		checkerr.h dumpdate.h bitstring.h
+-LIBS=		-ldeflt -lrmt -lfind -lschily $(LIB_ACL) $(LIB_ATTR) $(LIB_SOCKET) $(LIB_INTL)
++LIBS=		-ldeflt -lrmt -lfind -lschily $(LIB_ACL) $(LIB_ATTR) $(LIB_SOCKET) $(LIB_INTL) $(LIB_SELINUX)
+ XMK_FILE=	spaxman.mk
+ 
+ ###########################################################################
+diff -urNp star-1.5-orig/star/star.c star-1.5/star/star.c
+--- star-1.5-orig/star/star.c	2008-04-13 15:01:30.000000000 +0200
++++ star-1.5/star/star.c	2008-12-18 16:05:31.000000000 +0100
+@@ -46,6 +46,10 @@ static	char sccsid[] =
+ #include "starsubs.h"
+ #include "checkerr.h"
+ 
++#ifdef WITH_SELINUX
++int selinux_enabled=0;
++#endif
++
+ EXPORT	int	main		__PR((int ac, char **av));
+ LOCAL	void	star_create	__PR((int ac, char *const *av));
+ LOCAL	void	checkdumptype	__PR((GINFO *gp));
+@@ -388,6 +392,10 @@ main(ac, av)
+ 			comerr("Panic cannot set back effective uid.\n");
+ 	}
+ 	my_uid = geteuid();
++
++#ifdef WITH_SELINUX
++	selinux_enabled=is_selinux_enabled()>0;
++#endif
+ 	/*
+ 	 * WARNING: We now are no more able to open a new remote connection
+ 	 * unless we have been called by root.
+diff -urNp star-1.5-orig/star/star_fat.mk star-1.5/star/star_fat.mk
+--- star-1.5-orig/star/star_fat.mk	2008-04-06 20:02:25.000000000 +0200
++++ star-1.5/star/star_fat.mk	2008-12-18 16:04:20.000000000 +0100
+@@ -29,6 +29,7 @@ CPPOPTS +=	-DUSE_FFLAGS
+ CPPOPTS +=	-DCOPY_LINKS_DELAYED
+ CPPOPTS +=	-DSTAR_FAT
+ CPPOPTS +=	-DSCHILY_PRINT
++CPPOPTS +=	-DWITH_SELINUX
+ CFILES=		star_fat.c header.c cpiohdr.c xheader.c xattr.c \
+ 		list.c extract.c create.c append.c diff.c restore.c \
+ 		remove.c star_unix.c acl_unix.c acltext.c fflags.c \
+@@ -48,7 +49,7 @@ HFILES=		star.h starsubs.h dirtime.h xta
+ 
+ #LIBS=		-lunos
+ #LIBS=		-lschily -lc /usr/local/lib/gcc-gnulib
+-LIBS=		-ldeflt -lrmt -lfind -lschily $(LIB_ACL) $(LIB_ATTR) $(LIB_SOCKET) $(LIB_INTL)
++LIBS=		-ldeflt -lrmt -lfind -lschily $(LIB_ACL) $(LIB_ATTR) $(LIB_SOCKET) $(LIB_INTL) $(LIB_SELINUX)
+ #
+ #	Wenn -lfind, dann auch  $(LIB_INTL)
+ #
+diff -urNp star-1.5-orig/star/star.mk star-1.5/star/star.mk
+--- star-1.5-orig/star/star.mk	2008-04-06 20:01:45.000000000 +0200
++++ star-1.5/star/star.mk	2008-12-18 16:06:07.000000000 +0100
+@@ -21,6 +21,7 @@ CPPOPTS +=	-DUSE_XATTR
+ CPPOPTS +=	-DUSE_FFLAGS
+ CPPOPTS +=	-DCOPY_LINKS_DELAYED
+ CPPOPTS +=	-DSCHILY_PRINT
++CPPOPTS +=	-DWITH_SELINUX
+ CFILES=		star.c header.c cpiohdr.c xheader.c xattr.c \
+ 		list.c extract.c create.c append.c diff.c restore.c \
+ 		remove.c star_unix.c acl_unix.c acltext.c fflags.c \
+@@ -35,7 +36,7 @@ CFILES=		star.c header.c cpiohdr.c xhead
+ HFILES=		star.h starsubs.h dirtime.h xtab.h xutimes.h \
+ 		movearch.h table.h props.h fifo.h diff.h restore.h \
+ 		checkerr.h dumpdate.h bitstring.h
+-LIBS=		-ldeflt -lrmt -lfind -lschily $(LIB_ACL) $(LIB_ATTR) $(LIB_SOCKET) $(LIB_INTL)
++LIBS=		-ldeflt -lrmt -lfind -lschily $(LIB_ACL) $(LIB_ATTR) $(LIB_SOCKET) $(LIB_INTL) $(LIB_SELINUX)
+ XMK_FILE=	Makefile.man starformatman.mk
+ 
+ ###########################################################################
+diff -urNp star-1.5-orig/star/starsubs.h star-1.5/star/starsubs.h
+--- star-1.5-orig/star/starsubs.h	2008-04-06 17:32:15.000000000 +0200
++++ star-1.5/star/starsubs.h	2008-12-18 16:01:15.000000000 +0100
+@@ -304,6 +304,11 @@ extern	void	opt_xattr	__PR((void));
+ extern	BOOL	get_xattr	__PR((register FINFO *info));
+ extern	BOOL	set_xattr	__PR((register FINFO *info));
+ extern	void	free_xattr	__PR((star_xattr_t **xattr));
++# ifdef WITH_SELINUX
++#include <selinux/selinux.h>
++extern BOOL    setselinux __PR((register FINFO *info));
++extern int selinux_enabled;
++# endif
+ #endif
+ 
+ /*
+diff -urNp star-1.5-orig/star/suntar.mk star-1.5/star/suntar.mk
+--- star-1.5-orig/star/suntar.mk	2008-04-06 20:01:45.000000000 +0200
++++ star-1.5/star/suntar.mk	2008-12-18 15:58:44.000000000 +0100
+@@ -19,6 +19,7 @@ CPPOPTS +=	-DUSE_FIND
+ CPPOPTS +=	-DUSE_ACL
+ CPPOPTS +=	-DUSE_XATTR
+ CPPOPTS +=	-DUSE_FFLAGS
++CPPOPTS +=	-DWITH_SELINUX
+ CPPOPTS +=	-DSCHILY_PRINT
+ CFILES=		suntar.c header.c cpiohdr.c xheader.c xattr.c \
+ 		list.c extract.c create.c append.c diff.c restore.c \
+@@ -34,7 +35,7 @@ CFILES=		suntar.c header.c cpiohdr.c xhe
+ HFILES=		star.h starsubs.h dirtime.h xtab.h xutimes.h \
+ 		movearch.h table.h props.h fifo.h diff.h \
+ 		checkerr.h dumpdate.h bitstring.h
+-LIBS=		-ldeflt -lrmt -lfind -lschily $(LIB_ACL) $(LIB_ATTR) $(LIB_SOCKET) $(LIB_INTL)
++LIBS=		-ldeflt -lrmt -lfind -lschily $(LIB_ACL) $(LIB_ATTR) $(LIB_SOCKET) $(LIB_INTL) $(LIB_SELINUX)
+ XMK_FILE=	suntarman.mk
+ 
+ ###########################################################################
+diff -urNp star-1.5-orig/star/xattr.c star-1.5/star/xattr.c
+--- star-1.5-orig/star/xattr.c	2008-03-16 16:40:41.000000000 +0100
++++ star-1.5/star/xattr.c	2008-12-18 16:08:15.000000000 +0100
+@@ -196,6 +196,27 @@ fail:
+ #endif  /* USE_XATTR */
+ }
+ 
++#ifdef WITH_SELINUX
++EXPORT BOOL
++setselinux(info)
++       register FINFO *info;
++{
++#if defined(USE_XATTR) && defined(HAVE_SETXATTR) && defined(WITH_SELINUX)
++       if (info->f_xattr) {
++               star_xattr_t    *xap;
++               for (xap = info->f_xattr; xap->name != NULL; xap++) {
++                 if (strcmp(xap->name, "security.selinux") == 0) {
++                   if (setfscreatecon(xap->value)) {
++                     return FALSE;
++                   }
++                 }
++               }
++       }
++#endif  /* USE_XATTR && WITH_SELINUX */
++       return TRUE;
++}
++#endif
++
+ /* ARGSUSED */
+ EXPORT BOOL
+ set_xattr(info)
+@@ -209,6 +230,10 @@ set_xattr(info)
+ 		return (TRUE);
+ 
+ 	for (xap = info->f_xattr; xap->name != NULL; xap++) {
++#ifdef WITH_SELINUX
++		if (selinux_enabled && (strcmp(xap->name, "security.selinux") == 0))
++			continue;
++#endif
+ 		if (lsetxattr(info->f_name, xap->name, xap->value,
+ 		    xap->value_len, 0) != 0) {
+ 			if (!errhidden(E_SETXATTR, info->f_name)) {

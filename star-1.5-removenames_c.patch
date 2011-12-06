@@ -1,0 +1,60 @@
+diff -urNp star-1.5-orig/star/cpio.mk star-1.5/star/cpio.mk
+--- star-1.5-orig/star/cpio.mk	2009-01-28 09:46:18.000000000 +0100
++++ star-1.5/star/cpio.mk	2009-01-28 09:47:00.000000000 +0100
+@@ -25,7 +25,7 @@ CFILES=		cpio.c header.c cpiohdr.c xhead
+ 		list.c extract.c create.c append.c diff.c restore.c \
+ 		remove.c star_unix.c acl_unix.c acltext.c fflags.c \
+ 		buffer.c dirtime.c lhash.c \
+-		hole.c longnames.c names.c \
++		hole.c longnames.c \
+ 		movearch.c table.c props.c \
+ 		unicode.c \
+ 		subst.c volhdr.c \
+diff -urNp star-1.5-orig/star/gnutar.mk star-1.5/star/gnutar.mk
+--- star-1.5-orig/star/gnutar.mk	2009-01-28 09:46:18.000000000 +0100
++++ star-1.5/star/gnutar.mk	2009-01-28 09:47:13.000000000 +0100
+@@ -25,7 +25,7 @@ CFILES=		gnutar.c header.c cpiohdr.c xhe
+ 		list.c extract.c create.c append.c diff.c restore.c \
+ 		remove.c star_unix.c acl_unix.c acltext.c fflags.c \
+ 		buffer.c dirtime.c lhash.c \
+-		hole.c longnames.c names.c \
++		hole.c longnames.c \
+ 		movearch.c table.c props.c \
+ 		unicode.c \
+ 		subst.c volhdr.c \
+diff -urNp star-1.5-orig/star/pax.mk star-1.5/star/pax.mk
+--- star-1.5-orig/star/pax.mk	2009-01-28 09:46:18.000000000 +0100
++++ star-1.5/star/pax.mk	2009-01-28 09:47:32.000000000 +0100
+@@ -26,7 +26,7 @@ CFILES=		pax.c header.c cpiohdr.c xheade
+ 		list.c extract.c create.c append.c diff.c restore.c \
+ 		remove.c star_unix.c acl_unix.c acltext.c fflags.c \
+ 		buffer.c dirtime.c lhash.c \
+-		hole.c longnames.c names.c \
++		hole.c longnames.c \
+ 		movearch.c table.c props.c \
+ 		unicode.c \
+ 		subst.c volhdr.c \
+diff -urNp star-1.5-orig/star/star.mk star-1.5/star/star.mk
+--- star-1.5-orig/star/star.mk	2009-01-28 09:46:18.000000000 +0100
++++ star-1.5/star/star.mk	2009-01-28 09:49:05.000000000 +0100
+@@ -26,7 +26,7 @@ CFILES=		star.c header.c cpiohdr.c xhead
+ 		list.c extract.c create.c append.c diff.c restore.c \
+ 		remove.c star_unix.c acl_unix.c acltext.c fflags.c \
+ 		buffer.c dirtime.c lhash.c \
+-		hole.c longnames.c names.c \
++		hole.c longnames.c \
+ 		movearch.c table.c props.c \
+ 		unicode.c \
+ 		subst.c volhdr.c \
+diff -urNp star-1.5-orig/star/suntar.mk star-1.5/star/suntar.mk
+--- star-1.5-orig/star/suntar.mk	2009-01-28 09:46:18.000000000 +0100
++++ star-1.5/star/suntar.mk	2009-01-28 09:51:01.000000000 +0100
+@@ -25,7 +25,7 @@ CFILES=		suntar.c header.c cpiohdr.c xhe
+ 		list.c extract.c create.c append.c diff.c restore.c \
+ 		remove.c star_unix.c acl_unix.c acltext.c fflags.c \
+ 		buffer.c dirtime.c lhash.c \
+-		hole.c longnames.c names.c \
++		hole.c longnames.c \
+ 		movearch.c table.c props.c \
+ 		unicode.c \
+ 		subst.c volhdr.c \
